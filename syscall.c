@@ -191,7 +191,7 @@ static int (*syscalls[])(void) = {
 static void
 print_syscall_args(int num)
 {
-  int i, val;
+  int i, val=0;
   char *str;
 
   cprintf("(");
