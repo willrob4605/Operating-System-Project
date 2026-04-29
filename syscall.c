@@ -6,6 +6,12 @@
 #include "proc.h"
 #include "x86.h"
 #include "syscall.h"
+enum argtype {
+  ARG_END = 0,  // no more arguments
+  ARG_INT = 1,  // integer
+  ARG_STR = 2,  // string pointer
+  ARG_PTR = 3   // other pointer
+};
 
 // User code makes a system call with INT T_SYSCALL.
 // System call number in %eax.
@@ -103,6 +109,58 @@ extern int sys_unlink(void);
 extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
+extern int sys_trace(void); //add system trace call
+
+static int syscall_argtypes[][4] = {
+[SYS_fork]   = {ARG_END},
+[SYS_exit]   = {ARG_END},
+[SYS_wait]   = {ARG_END},
+[SYS_pipe]   = {ARG_PTR, ARG_END},
+[SYS_read]   = {ARG_INT, ARG_PTR, ARG_INT, ARG_END},
+[SYS_kill]   = {ARG_INT, ARG_END},
+[SYS_exec]   = {ARG_STR, ARG_PTR, ARG_END},
+[SYS_fstat]  = {ARG_INT, ARG_PTR, ARG_END},
+[SYS_chdir]  = {ARG_STR, ARG_END},
+[SYS_dup]    = {ARG_INT, ARG_END},
+[SYS_getpid] = {ARG_END},
+[SYS_sbrk]   = {ARG_INT, ARG_END},
+[SYS_sleep]  = {ARG_INT, ARG_END},
+[SYS_uptime] = {ARG_END},
+[SYS_open]   = {ARG_STR, ARG_INT, ARG_END},
+[SYS_write]  = {ARG_INT, ARG_PTR, ARG_INT, ARG_END},
+[SYS_mknod]  = {ARG_STR, ARG_INT, ARG_INT, ARG_END},
+[SYS_unlink] = {ARG_STR, ARG_END},
+[SYS_link]   = {ARG_STR, ARG_STR, ARG_END},
+[SYS_mkdir]  = {ARG_STR, ARG_END},
+[SYS_close]  = {ARG_INT, ARG_END},
+[SYS_trace]  = {ARG_INT, ARG_END},
+};
+
+//names array for when printing syscall names
+static char *syscallnames[] = {
+[SYS_fork]    "fork",
+[SYS_exit]    "exit",
+[SYS_wait]    "wait",
+[SYS_pipe]    "pipe",
+[SYS_read]    "read",
+[SYS_kill]    "kill",
+[SYS_exec]    "exec",
+[SYS_fstat]   "fstat",
+[SYS_chdir]   "chdir",
+[SYS_dup]     "dup",
+[SYS_getpid]  "getpid",
+[SYS_sbrk]    "sbrk",
+[SYS_sleep]   "sleep",
+[SYS_uptime]  "uptime",
+[SYS_open]    "open",
+[SYS_write]   "write",
+[SYS_mknod]   "mknod",
+[SYS_unlink]  "unlink",
+[SYS_link]    "link",
+[SYS_mkdir]   "mkdir",
+[SYS_close]   "close",
+[SYS_trace]   "trace",
+};
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -126,8 +184,43 @@ static int (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_trace]   sys_trace, //add to array of syscalls
 };
 
+// prints syscall arguments
+static void
+print_syscall_args(int num)
+{
+  int i, val;
+  char *str;
+
+  cprintf("(");
+
+  for(i = 0; i < 3; i++){
+    if(syscall_argtypes[num][i] == ARG_END)
+      break;
+
+    if(i > 0)
+      cprintf(", ");
+
+    if(syscall_argtypes[num][i] == ARG_INT){
+      argint(i, &val);
+      cprintf("%d", val);
+    }
+    else if(syscall_argtypes[num][i] == ARG_STR){
+      if(argstr(i, &str) < 0)
+        cprintf("?");
+      else
+        cprintf("\"%s\"", str);
+    }
+    else if(syscall_argtypes[num][i] == ARG_PTR){
+      argint(i, &val);
+      cprintf("%p", (void*)val);
+    }
+  }
+
+  cprintf(")");
+}
 void
 syscall(void)
 {
@@ -137,6 +230,14 @@ syscall(void)
   num = curproc->tf->eax;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     curproc->tf->eax = syscalls[num]();
+
+    // if this syscall's bit is set in tracemask, print the trace
+    if(curproc->tracemask & (1 << num)){
+      cprintf("%d: syscall %s", curproc->pid, syscallnames[num]);
+      print_syscall_args(num);
+      cprintf(" -> %d\n", curproc->tf->eax);
+    }
+
   } else {
     cprintf("%d %s: unknown sys call %d\n",
             curproc->pid, curproc->name, num);
