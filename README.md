@@ -12,7 +12,7 @@
 ## To Install on Ubuntu
 ```bash
 sudo apt-get update
-sudo apt-get install gcc-multilib qemu-system-x86 make
+sudo apt-get install git gcc-multilib qemu-system-x86 make
 ```
 
 ## Build Instructions
