@@ -11,10 +11,12 @@ main(void)
   write(1, "Hello World!\n", 13);
   trace(0);
 
-  // Test 2: trace read and write
-  printf(1, "--- Test 2: trace read and write ---\n");
+  // Test 2: trace read and write read requires input from keyboard
+  printf(1, "Test 2: trace read and write \n");
   trace(1 << SYS_read | 1 << SYS_write);
   write(1, "tracing both\n", 13);
+  char buf[20];
+  read(0, buf, sizeof(buf)); 
   trace(0);
 
   // Test 3: child inherits tracemask from parent
