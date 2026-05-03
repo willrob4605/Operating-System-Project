@@ -11,6 +11,7 @@
 
 ## To Install on Ubuntu
 ```bash
+sudo apt-get update
 sudo apt-get install gcc-multilib qemu-system-x86 make
 ```
 
